@@ -6,7 +6,7 @@ Args:
 
 Returns:
   Slide object
-  
+
 https://stackoverflow.com/questions/47086599/parallelising-tf-data-dataset-from-generator
 """
 from foreground import get_foreground
@@ -111,9 +111,7 @@ class Slide(object):
     def _get_load_params(self):
 
         downsample = int(self.slide_info['scan_power'] / self.process_mag)
-
         loading_level = self.svs.get_best_level_for_downsample(downsample)
-
         load_level_dims = self.svs.level_dimensions[loading_level][::-1]
 
         loading_size, post_load_resize = self._get_load_size(self.process_size,
@@ -171,7 +169,11 @@ class Slide(object):
         return img
 
 
-    # Like this:
+    def generate_index(self):
+        for idx, _ in enumerate(self.tile_list):
+            yield idx
+
+
     def generator(self):
         for coords in self.tile_list:
             yield self._read_tile(coords)

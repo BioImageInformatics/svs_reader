@@ -1,6 +1,5 @@
 import numpy as np
 import tensorflow as tf
-import tensorflow.contrib.eager as tfe
 import sys
 import cv2
 import time
