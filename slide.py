@@ -17,6 +17,7 @@ import cv2
 class Slide(object):
     slide_defaults = {
         'slide_path': None,
+        'preprocess_fn': lambda x: x,  ## none
         'process_mag': 10,
         'process_size': 256,
         'oversample_factor': 1.1,
@@ -33,6 +34,9 @@ class Slide(object):
         self.foreground = get_foreground(self.svs)
         self._get_load_params()
         self.tile()
+
+        ## Reconstruction params
+        self._get_place_params()
 
 
     # Returns the OpenSlide object
@@ -59,12 +63,16 @@ class Slide(object):
             'level_count': level_count,
             'high_power_dim': high_power_dim,
             'low_power_dim': low_power_dim }
-
         return svs
 
+
     # Set up the output image to the same size as the level-0 shape
-    def _initialize_output(self):
-        pass
+    def initialize_output(self, n_classes):
+        h,w = self.foreground.shape[:2]
+        output_img = np.zeros((h,w,n_classes), dtype=np.float32)
+        print 'Initialized output image shape: {}'.format(output_img.shape)
+
+        self.output_img = output_img
 
 
     def _get_load_size(self, process_size, loading_level, downsample):
@@ -88,7 +96,6 @@ class Slide(object):
             print 'Loading size: {} ({}x processing size)'.format(
                 process_size*ratio, ratio)
             return process_size*ratio, 1./ratio
-
 
 
     # Logic translating slide params and requested process_mag into read_region args
@@ -116,8 +123,25 @@ class Slide(object):
 
 
     # Logic translating processing size into reconstruct() args
-    def _get_place_params():
-        pass
+    def _get_place_params(self):
+        ## Place w.r.t. level 0
+        ## We have process downsample.. and downsample w.r.t. Last level
+        ds_low_level = int(self.svs.level_downsamples[-1])
+        place_downsample = self.downsample / float(ds_low_level)
+        self.ds_low_level = ds_low_level
+
+        place_size = int(self.process_size * place_downsample)
+        print 'Placing size: {}'.format(place_size)
+        self.place_size = place_size
+
+        place_list = []
+        for coords in self.tile_list:
+            x, y = coords
+            place_list.append([
+                int(x*(1./ds_low_level)),
+                int(y*(1./ds_low_level)) ])
+        self.place_list = place_list
+
 
     # Call openslide.read_region on the slide
     # with all the right settings: level, dimensions, etc.
@@ -129,7 +153,9 @@ class Slide(object):
         img = cv2.cvtColor(img, cv2.COLOR_RGBA2RGB)
         img = cv2.resize(img, dsize=(0,0), fx=self.post_load_resize,
             fy=self.post_load_resize)
+        img = self.preprocess_fn(img)
         return img
+
 
     # Like this:
     def generator(self):
@@ -183,9 +209,17 @@ class Slide(object):
         self.tile_list = self._find_all_tiles()
         self._reject_background()
 
+
     # place x into location, doing whatever downsampling is needed
-    def reconstruct(x, location):
-        pass
+    def place(self, x, idx):
+        place_coord = self.place_list[idx]
+        x0, y0 = place_coord
+        x1 = x0 + self.place_size
+        y1 = y0 + self.place_size
+        # print 'Resize {} --> {}'.format(x.shape, self.place_size),
+        x = cv2.resize(x, dsize=(self.place_size, self.place_size))
+        # print 'placing {}:{}, {}:{} ; {}'.format(x0, x1, y0, y1, x.shape)
+        self.output_img[y0:y1, x0:x1, :] += x
 
 
     # colorize, and write out
