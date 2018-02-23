@@ -89,7 +89,6 @@ def imfill(img):
 
 
 def get_foreground(svs):
-    print 'Getting foreground area...',
     img = read_low_level(svs)
 
     # Boolean image of white areas
@@ -102,7 +101,5 @@ def get_foreground(svs):
         process_map = whitemap_filled.astype(np.uint8)
     elif whitemap_filled.dtype == 'uint8':
         process_map = whitemap_filled
-
-    print 'Done'
 
     return process_map
