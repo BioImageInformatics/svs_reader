@@ -17,12 +17,11 @@ import cv2
 class Slide(object):
     slide_defaults = {
         'slide_path': None,
-        'preprocess_fn': lambda x: x,  ## none
+        'preprocess_fn': lambda x: x,  ## ID
         'process_mag': 10,
         'process_size': 256,
-        'oversample_factor': 1.1,
-    }
-
+        'oversample_factor': 1.1, }
+        
     # set up constants parse slide information
     # set up output image
     def __init__(self, **kwargs):
