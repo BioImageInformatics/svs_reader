@@ -16,9 +16,12 @@ https://www.tensorflow.org/programmers_guide/datasets
 https://www.tensorflow.org/api_docs/python/tf/data/Dataset
 """
 
-print '\nslide at 5x'
-slide_path = '/home/nathan/data/ccrcc/TCGA_KIRC/'
-slide_path += 'TCGA-A3-3346-01Z-00-DX1.95280216-fd71-4a03-b452-6e3d667f2542.svs'
+# slide_path = '/home/nathan/data/ccrcc/TCGA_KIRC/'
+# slide_path += 'TCGA-A3-3346-01Z-00-DX1.95280216-fd71-4a03-b452-6e3d667f2542.svs'
+
+# slide_path = '/home/nathan/data/gleason_grade/wsi/s10-3220-001.svs'
+slide_path = '/home/nathan/biobank/_DURHAM_SLIDES_/_Cases_/S10-3220/s10-3220-001.svs'
+
 preprocess_fn = lambda x: ((x * (2/255.)) - 1).astype(np.float32)
 s = Slide(slide_path    = slide_path,
           process_mag   = 10,
@@ -49,7 +52,7 @@ with tf.Session(config=config) as sess:
     ds = tf.data.Dataset.from_generator(generator=s.generate_index,
         output_types=tf.int64)
     ds = ds.map(read_region_at_index, num_parallel_calls=8)
-    ds = ds.shuffle(128)
+    # ds = ds.shuffle(128)
     ds = ds.prefetch(256)
     iterator = ds.make_one_shot_iterator()
     img, idx = iterator.get_next()

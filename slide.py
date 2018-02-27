@@ -68,6 +68,11 @@ class Slide(object):
             'low_power_dim': low_power_dim }
         return svs
 
+    def close(self):
+        print 'Closing slide'
+        self.foreground = []
+        self.output_imgs = []
+        self.svs.close()
 
     # Set up the output image to the same size as the level-0 shape
     def initialize_output(self, name, dim):
