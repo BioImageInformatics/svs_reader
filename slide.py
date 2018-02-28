@@ -22,7 +22,8 @@ class Slide(object):
         'process_mag': 10,
         'process_size': 256,
         'normalize_fn': reinhard,
-        'oversample_factor': 1.1,
+        'oversample_factor': 1.25,
+        'output_types': ['prob'],
         'verbose': False}
 
     # set up constants parse slide information
@@ -68,11 +69,13 @@ class Slide(object):
             'low_power_dim': low_power_dim }
         return svs
 
+
     def close(self):
         print 'Closing slide'
         self.foreground = []
         self.output_imgs = []
         self.svs.close()
+
 
     # Set up the output image to the same size as the level-0 shape
     def initialize_output(self, name, dim):
@@ -118,7 +121,6 @@ class Slide(object):
         downsample = int(self.slide_info['scan_power'] / self.process_mag)
         loading_level = self.svs.get_best_level_for_downsample(downsample)
         load_level_dims = self.svs.level_dimensions[loading_level][::-1]
-
         loading_size, post_load_resize = self._get_load_size(self.process_size,
             loading_level, downsample)
 
@@ -143,7 +145,6 @@ class Slide(object):
         ds_low_level = int(self.svs.level_downsamples[-1])
         place_downsample = self.downsample / float(ds_low_level)
         self.ds_low_level = ds_low_level
-
         place_size = int(self.process_size * place_downsample)
         if self.verbose:
             print 'Placing size: {}'.format(place_size)
@@ -244,6 +245,25 @@ class Slide(object):
         x = cv2.resize(x, dsize=(self.place_size, self.place_size))
         # print 'placing {}:{}, {}:{} ; {}'.format(x0, x1, y0, y1, x.shape)
         self.output_imgs[name][y0:y1, x0:x1, :] += x
+
+
+    ## Valid probability distribution sums to 1.
+    ## We can tell where the overlaps are by finding areas that sum > 1
+    def normalize_probability_image(self):
+        prob_img = self.output_imgs['prob']
+        rgb = self.output_imgs['rgb']
+        prob_sum = np.sum(prob_img, axis=-1)
+        twice_overlapping = prob_sum == 2
+        quad_overlapping = prob_sum == 4
+        print 'Found {} unique coverages'.format(np.unique(prob_sum))
+        print 'Normalizing {} areas with 2x coverage'.format(twice_overlapping.sum())
+        print 'Normalizing {} areas with 4x coverage'.format(quad_overlapping.sum())
+        prob_img[twice_overlapping] = prob_img[twice_overlapping] / 2.
+        prob_img[quad_overlapping] = prob_img[quad_overlapping] / 4.
+        rgb[twice_overlapping] = rgb[twice_overlapping] / 2.
+        rgb[quad_overlapping] = rgb[quad_overlapping] / 4.
+        self.output_imgs['prob'] = prob_img
+        self.output_imgs['rgb'] = rgb
 
 
     # colorize, and write out
