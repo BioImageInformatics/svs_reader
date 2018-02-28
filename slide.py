@@ -195,9 +195,9 @@ class Slide(object):
         est_x = int(load_x / self.loading_size)
 
         y_coord = np.linspace(0, load_y-self.loading_size,
-            est_y*self.oversample_factor, dtype=np.int64)
+            int(est_y*self.oversample_factor), dtype=np.int64)
         x_coord = np.linspace(0, load_x-self.loading_size,
-            est_x*self.oversample_factor, dtype=np.int64)
+            int(est_x*self.oversample_factor), dtype=np.int64)
 
         if self.verbose:
             print 'Estimated w={} x h={} tiles'.format(est_w, est_h)
