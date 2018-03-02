@@ -18,6 +18,7 @@ import cv2
 class Slide(object):
     slide_defaults = {
         'slide_path': None,
+        'low_level_mag': 5,
         'preprocess_fn': lambda x: x,  ## ID
         'process_mag': 10,
         'process_size': 256,
@@ -34,7 +35,8 @@ class Slide(object):
             setattr(self, key, val)
 
         self.svs = self._parse_svs_info()
-        self.foreground = get_foreground(self.svs)
+        # self.low_level_index = self.get_low_level_index()
+        self.foreground = get_foreground(self.svs, low_level_index=2)
         self._get_load_params()
         self.tile()
 
@@ -42,6 +44,13 @@ class Slide(object):
         self._get_place_params()
         self.output_imgs = {}
 
+
+    def _get_low_level_index(self):
+        ## get the info to read/write the low-level image more efficiently
+        ## This operation is instead of simply using the lowest resolution
+        ## size to write output.
+        ## Use the scanned power, and requested magnification to find the downsample factor
+        pass
 
     # Returns the OpenSlide object
     # Populates a dict with:
@@ -80,7 +89,9 @@ class Slide(object):
     # Set up the output image to the same size as the level-0 shape
     def initialize_output(self, name, dim):
         h,w = self.foreground.shape[:2]
-        output_img = np.zeros((h,w,dim), dtype=np.float32)
+        # h *= self.low_level_upsample
+        # w *= self.low_level_upsample
+        output_img = np.zeros((int(h), int(w), dim), dtype=np.float32)
 
         if self.verbose:
             print 'Initialized output image shape: {}'.format(output_img.shape)
@@ -142,7 +153,7 @@ class Slide(object):
     def _get_place_params(self):
         ## Place w.r.t. level 0
         ## We have process downsample.. and downsample w.r.t. Last level
-        ds_low_level = int(self.svs.level_downsamples[-1])
+        ds_low_level = int(self.svs.level_downsamples[2])
         place_downsample = self.downsample / float(ds_low_level)
         self.ds_low_level = ds_low_level
         place_size = int(self.process_size * place_downsample)
@@ -229,46 +240,48 @@ class Slide(object):
 
         self.tile_list = tile_list
 
-
     def tile(self):
         self.tile_list = self._find_all_tiles()
         self._reject_background()
-
 
     # place x into location, doing whatever downsampling is needed
     def place(self, x, idx, name):
         place_coord = self.place_list[idx]
         y0, x0 = place_coord
-        x1 = x0 + self.place_size
-        y1 = y0 + self.place_size
+        x1 = x0 + int(self.place_size)
+        y1 = y0 + int(self.place_size)
         # print 'Resize {} --> {}'.format(x.shape, self.place_size),
-        x = cv2.resize(x, dsize=(self.place_size, self.place_size))
+        x = cv2.resize(x, dsize=(int(self.place_size),
+            int(self.place_size)))
         # print 'placing {}:{}, {}:{} ; {}'.format(x0, x1, y0, y1, x.shape)
         self.output_imgs[name][y0:y1, x0:x1, :] += x
 
+    def place_batch(self, xs, idxs, name):
+        for x , idx in zip(xs,idxs):
+            self.place(x, idx, name)
 
     ## Valid probability distribution sums to 1.
     ## We can tell where the overlaps are by finding areas that sum > 1
-    def normalize_probability_image(self):
+    def get_overlapping_images(self):
         prob_img = self.output_imgs['prob']
-        rgb = self.output_imgs['rgb']
         prob_sum = np.sum(prob_img, axis=-1)
-        twice_overlapping = prob_sum == 2
-        quad_overlapping = prob_sum == 4
-        print 'Found {} unique coverages'.format(np.unique(prob_sum))
-        print 'Normalizing {} areas with 2x coverage'.format(twice_overlapping.sum())
-        print 'Normalizing {} areas with 4x coverage'.format(quad_overlapping.sum())
-        prob_img[twice_overlapping] = prob_img[twice_overlapping] / 2.
-        prob_img[quad_overlapping] = prob_img[quad_overlapping] / 4.
-        rgb[twice_overlapping] = rgb[twice_overlapping] / 2.
-        rgb[quad_overlapping] = rgb[quad_overlapping] / 4.
-        self.output_imgs['prob'] = prob_img
-        self.output_imgs['rgb'] = rgb
+
+        self.twice_overlapping = prob_sum == 2
+        self.thrice_overlapping = prob_sum == 3
+        self.quad_overlapping = prob_sum == 4
+        print 'Found {} areas with 2x coverage'.format(self.twice_overlapping.sum())
+        print 'Found {} areas with 3x coverage'.format(self.thrice_overlapping.sum())
+        print 'Found {} areas with 4x coverage'.format(self.quad_overlapping.sum())
 
 
     # colorize, and write out
-    def make_outputs():
-        pass
+    def make_outputs(self):
+        self.get_overlapping_images()
+        for key, img in self.output_imgs.items():
+            img[self.twice_overlapping]  = img[self.twice_overlapping] / 2.
+            img[self.thrice_overlapping] = img[self.thrice_overlapping] / 3.
+            img[self.quad_overlapping]   = img[self.quad_overlapping] / 4.
+            self.output_imgs[key] = img
 
 
     def print_info(self):

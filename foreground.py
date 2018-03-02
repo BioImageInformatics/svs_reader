@@ -25,8 +25,12 @@ def read_region(svs, x, y, level, size, flip_channels=False, verbose=False):
     return img
 
 
-def read_low_level(svs, verbose=False):
-    low_index = svs.level_count - 1
+def read_low_level(svs, low_level_index=None, verbose=False):
+    if low_level_index is None:
+        low_index = svs.level_count - 1
+    else:
+        low_index = low_level_index
+
     img = read_region(svs, 0, 0, low_index, svs.level_dimensions[low_index],
         flip_channels=True, verbose=verbose)
     return img
@@ -88,8 +92,8 @@ def imfill(img):
     return img2 > 0
 
 
-def get_foreground(svs):
-    img = read_low_level(svs)
+def get_foreground(svs, low_level_index=None):
+    img = read_low_level(svs, low_level_index=low_level_index)
 
     # Boolean image of white areas
     whitemap = whitespace(img, mode='thresh')
