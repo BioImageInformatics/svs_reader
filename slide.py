@@ -98,7 +98,10 @@ class Slide(object):
 
         ## Initialize an image for one-value-per-tile output (dimensions reducing)
         elif mode=='tile':
-            pass
+            y = len(self.y_coord)
+            x = len(self.x_coord)
+            output_img = np.zeros((y, x, dim), dtype=np.float32)
+            self.output_imgs[name] = output_img
 
 
 
@@ -245,9 +248,12 @@ class Slide(object):
 
         tile_idx = 0
         tile_list = []
+        self.ds_tile_map = np.zeros((len(yc), len(xc)), dtype=np.uint64)-1
         for yi, yy in enumerate(yc):
             for xi, xx in enumerate(xc):
                 if foreground_ds[yi, xi]==1:
+                    self.ds_tile_map[yi, xi] = tile_idx
+                    tile_idx += 1
                     tile_list.append(
                         [yy*self.ds_load_level,
                          xx*self.ds_load_level])
@@ -262,21 +268,27 @@ class Slide(object):
         self.tile_list = self._find_all_tiles()
         self._reject_background()
 
-    # place x into location, doing whatever downsampling is needed
-    def place(self, x, idx, name):
-        place_coord = self.place_list[idx]
-        y0, x0 = place_coord
-        x1 = x0 + int(self.place_size)
-        y1 = y0 + int(self.place_size)
-        # print 'Resize {} --> {}'.format(x.shape, self.place_size),
-        x = cv2.resize(x, dsize=(int(self.place_size),
-            int(self.place_size)))
-        # print 'placing {}:{}, {}:{} ; {}'.format(x0, x1, y0, y1, x.shape)
-        self.output_imgs[name][y0:y1, x0:x1, :] += x
 
-    def place_batch(self, xs, idxs, name):
+    # place x into location, doing whatever downsampling is needed
+    def place(self, x, idx, name, mode='full'):
+        if mode=='full':
+            place_coord = self.place_list[idx]
+            y0, x0 = place_coord
+            x1 = x0 + int(self.place_size)
+            y1 = y0 + int(self.place_size)
+            # print 'Resize {} --> {}'.format(x.shape, self.place_size),
+            x = cv2.resize(x, dsize=(int(self.place_size),
+                int(self.place_size)))
+            # print 'placing {}:{}, {}:{} ; {}'.format(x0, x1, y0, y1, x.shape)
+            self.output_imgs[name][y0:y1, x0:x1, :] += x
+        elif mode=='tile':
+            location = self.ds_tile_map == idx
+            self.output_imgs[name][location] = x
+
+    def place_batch(self, xs, idxs, name, mode='full'):
         for x , idx in zip(xs,idxs):
-            self.place(x, idx, name)
+            self.place(x, idx, name, mode=mode)
+
 
     ## Valid probability distribution sums to 1.
     ## We can tell where the overlaps are by finding areas that sum > 1
