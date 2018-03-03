@@ -87,16 +87,19 @@ class Slide(object):
 
 
     # Set up the output image to the same size as the level-0 shape
-    def initialize_output(self, name, dim):
-        h,w = self.foreground.shape[:2]
-        # h *= self.low_level_upsample
-        # w *= self.low_level_upsample
-        output_img = np.zeros((int(h), int(w), dim), dtype=np.float32)
+    def initialize_output(self, name, dim, mode='full'):
+        ## Initialize an image for dimensions preserving output
+        if mode=='full':
+            h,w = self.foreground.shape[:2]
+            # h *= self.low_level_upsample
+            # w *= self.low_level_upsample
+            output_img = np.zeros((int(h), int(w), dim), dtype=np.float32)
+            self.output_imgs[name] = output_img
 
-        if self.verbose:
-            print 'Initialized output image shape: {}'.format(output_img.shape)
+        ## Initialize an image for one-value-per-tile output (dimensions reducing)
+        elif mode=='tile':
+            pass
 
-        self.output_imgs[name] = output_img
 
 
     def _get_load_size(self, process_size, loading_level, downsample):
@@ -171,6 +174,21 @@ class Slide(object):
         self.place_list = place_list
 
 
+    ## Returns the parameters needed to replicate the corresponding
+    ## call to _read_tile
+    ## return y1, y2, x1, x2, level, downsample
+    def _read_region_args(self, coords):
+        y1, x1 = coords
+        # y1 = int(y1 * self.post_load_resize)
+        # x1 = int(x1 * self.post_load_resize)
+        y1 = int(y1 / self.ds_load_level)
+        x1 = int(x1 / self.ds_load_level)
+        y2 = int(y1 + self.loading_size * self.post_load_resize)
+        x2 = int(x1 + self.loading_size * self.post_load_resize)
+        level = self.loading_level
+        downsample = self.post_load_resize
+        return y1, y2, x1, x2, level, downsample
+
     # Call openslide.read_region on the slide
     # with all the right settings: level, dimensions, etc.
     def _read_tile(self, coords):
@@ -192,8 +210,8 @@ class Slide(object):
 
 
     def generator(self):
-        for coords in self.tile_list:
-            yield self._read_tile(coords)
+        for idx, coords in enumerate(self.tile_list):
+            yield self._read_tile(coords), idx
 
 
     # Generate a list of foreground tiles
@@ -211,9 +229,9 @@ class Slide(object):
             int(est_x*self.oversample_factor), dtype=np.int64)
 
         if self.verbose:
-            print 'Estimated w={} x h={} tiles'.format(est_w, est_h)
-            print 'With oversample ~ {}, split w={} x h={}'.format(
-                self.oversample_factor, len(w_coord), len(h_coord) )
+            print 'Estimated w={} x h={} tiles'.format(est_x, est_y)
+            print 'With oversample ~ {}, split x={} x y={}'.format(
+                self.oversample_factor, len(x_coord), len(y_coord) )
 
         self.y_coord = y_coord
         self.x_coord = x_coord

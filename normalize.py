@@ -32,7 +32,7 @@ def reinhard(image, target=None):
     imageBM = np.ma.MaskedArray(imageB, whitemask)
 
     ## Sometimes STD is near 0, or 0; add epsilon to avoid div by 0 -NI
-    epsilon = 1e-11
+    epsilon = 1e-8
 
     imageLMean = imageLM.mean()
     imageLSTD = imageLM.std() + epsilon
