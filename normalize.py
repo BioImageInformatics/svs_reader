@@ -22,6 +22,10 @@ def reinhard(image, target=None):
     whitemask = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
     whitemask = whitemask > 215 ## TODO: Hard code threshold; replace with Otsu
 
+    if whitemask.sum() > 0.8*M*N:
+        ## All whilte; skip
+        return image
+
     imagelab = cv2.cvtColor(image, cv2.COLOR_RGB2LAB)
 
     imageL, imageA, imageB = cv2.split(imagelab)
@@ -32,7 +36,7 @@ def reinhard(image, target=None):
     imageBM = np.ma.MaskedArray(imageB, whitemask)
 
     ## Sometimes STD is near 0, or 0; add epsilon to avoid div by 0 -NI
-    epsilon = 1e-8
+    epsilon = 1e-12
 
     imageLMean = imageLM.mean()
     imageLSTD = imageLM.std() + epsilon
@@ -44,9 +48,9 @@ def reinhard(image, target=None):
     imageBSTD = imageBM.std() + epsilon
 
     # normalization in lab
-    imageL = (imageL - imageLMean) / imageLSTD * target[0][1] + target[0][0]
-    imageA = (imageA - imageAMean) / imageASTD * target[1][1] + target[1][0]
-    imageB = (imageB - imageBMean) / imageBSTD * target[2][1] + target[2][0]
+    imageL = (imageL - imageLMean) / imageLSTD * target[0][1]  + target[0][0]
+    imageA = (imageA - imageAMean) / imageASTD * target[1][1]  + target[1][0]
+    imageB = (imageB - imageBMean) / imageBSTD * target[2][1]  + target[2][0]
 
     imagelab = cv2.merge((imageL, imageA, imageB))
     imagelab = np.clip(imagelab, 0, 255)
