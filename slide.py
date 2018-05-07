@@ -17,23 +17,23 @@ import numpy as np
 import cv2
 
 class Slide(object):
-    slide_defaults = {
-        'slide_path': None,
-        'low_level_mag': 5,
-        'preprocess_fn': lambda x: x,  ## ID
-        'process_mag': 10,
-        'process_size': 256,
-        'normalize_fn': reinhard,
-        'oversample_factor': 1.25,
-        'output_types': [],
-        'output_res': '5x',
-        'verbose': False}
 
     # set up constants parse slide information
     # set up output image
     def __init__(self, **kwargs):
-        self.slide_defaults.update(kwargs)
-        for key, val in self.slide_defaults.items():
+        slide_defaults = {
+            'slide_path': None,
+            'low_level_mag': 5,
+            'preprocess_fn': lambda x: x,  ## ID
+            'process_mag': 10,
+            'process_size': 256,
+            'normalize_fn': reinhard,
+            'oversample_factor': 1.25,
+            'output_types': [],
+            'output_res': '5x',
+            'verbose': False}
+        slide_defaults.update(kwargs)
+        for key, val in slide_defaults.items():
             setattr(self, key, val)
 
         self.svs = self._parse_svs_info()
@@ -102,6 +102,7 @@ class Slide(object):
             output_img = np.zeros((y, x, dim), dtype=np.float32)
             self.output_imgs[name] = output_img
 
+        self.output_types.append(name)
 
 
     def _get_load_size(self, process_size, loading_level, downsample):
@@ -133,9 +134,10 @@ class Slide(object):
 
     # Logic translating slide params and requested process_mag into read_region args
     def _get_load_params(self):
-
+        ## Add a small number to the requested downsample because often we're off by some.
+        EPS = 1e-2
         downsample = int(self.slide_info['scan_power'] / self.process_mag)
-        loading_level = self.svs.get_best_level_for_downsample(downsample)
+        loading_level = self.svs.get_best_level_for_downsample(downsample+EPS)
         load_level_dims = self.svs.level_dimensions[loading_level][::-1]
         loading_size, post_load_resize = self._get_load_size(self.process_size,
             loading_level, downsample)
@@ -242,8 +244,8 @@ class Slide(object):
     def _reject_background(self):
         yc, xc = self.y_coord, self.x_coord
         foreground_ds = cv2.resize(self.foreground,
-            dsize=( len(xc), len(yc) ),
-            interpolation=cv2.INTER_NEAREST)
+                                   dsize=( len(xc), len(yc) ),
+                                   interpolation=cv2.INTER_NEAREST)
 
         tile_idx = 0
         tile_list = []
@@ -326,6 +328,11 @@ class Slide(object):
                 continue
 
             if key == 'output_imgs':
+                try:
+                    for vk, vv in val.items():
+                        print '|\t {}:\n|\t\t\t{}: {}'.format(key, vk, vv.shape)
+                except:
+                    print '|\t {}:\n|\t\t\tlen: {}'.format(key, len(val))
                 continue
 
             print('|\t {}:\n|\t\t\t{}'.format(key, val))
