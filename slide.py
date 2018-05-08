@@ -65,6 +65,9 @@ class Slide(object):
         high_power_dim = svs.level_dimensions[0][::-1]
         low_power_dim = svs.level_dimensions[-1][::-1]
 
+        if scan_power == 20 and level_count ==4:
+            raise Exception('Malformed slide. {}'.format(self.slide_path))
+
         if self.verbose:
             print('Slide: %s' % self.slide_path)
             print('\t power: %d' % scan_power)
@@ -330,9 +333,9 @@ class Slide(object):
             if key == 'output_imgs':
                 try:
                     for vk, vv in val.items():
-                        print '|\t {}:\n|\t\t\t{}: {}'.format(key, vk, vv.shape)
+                        print('|\t {}:\n|\t\t\t{}: {}'.format(key, vk, vv.shape))
                 except:
-                    print '|\t {}:\n|\t\t\tlen: {}'.format(key, len(val))
+                    print('|\t {}:\n|\t\t\tlen: {}'.format(key, len(val)))
                 continue
 
             print('|\t {}:\n|\t\t\t{}'.format(key, val))
