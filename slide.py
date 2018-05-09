@@ -31,7 +31,8 @@ class Slide(object):
             'output_types': [],
             'output_mag': 5,
             'verbose': False}
-
+            'output_res': '5x',
+            'verbose': False}
         slide_defaults.update(kwargs)
         for key, val in slide_defaults.items():
             setattr(self, key, val)
@@ -71,6 +72,9 @@ class Slide(object):
         high_power_dim = svs.level_dimensions[0][::-1]
         low_power_dim = svs.level_dimensions[-1][::-1]
 
+        if scan_power == 20 and level_count ==4:
+            raise Exception('Malformed slide. {}'.format(self.slide_path))
+
         if self.verbose:
             print('Slide: %s' % self.slide_path)
             print('\t power: %d' % scan_power)
@@ -98,8 +102,6 @@ class Slide(object):
         ## Initialize an image for dimensions preserving output
         if mode=='full':
             h,w = self.foreground.shape[:2]
-            # h *= self.low_level_upsample
-            # w *= self.low_level_upsample
             output_img = np.zeros((int(h), int(w), dim), dtype=np.float32)
             self.output_imgs[name] = output_img
 
