@@ -1,3 +1,4 @@
+from __future__ import print_function
 import cv2
 import numpy as np
 from openslide import OpenSlide
@@ -5,8 +6,8 @@ from openslide import OpenSlide
 def read_region(svs, x, y, level, size, flip_channels=False, verbose=False):
     # Utility function because openslide loads as RGBA
     if verbose:
-        print 'Reading SVS: ({},{}), LEVEL {}, SIZE={}'.format(
-            x,y,level,size)
+        print('Reading SVS: ({},{}), LEVEL {}, SIZE={}'.format(
+            x,y,level,size))
     #/end if
 
     ## TODO Check if region is out of range for the requested level
@@ -27,6 +28,7 @@ def read_region(svs, x, y, level, size, flip_channels=False, verbose=False):
 
 def read_low_level(svs, low_level_index=None, verbose=False):
     if low_level_index is None:
+        print('Inferring low level: {}'.format(svs.level_count - 1))
         low_index = svs.level_count - 1
     else:
         low_index = low_level_index

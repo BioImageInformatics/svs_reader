@@ -9,6 +9,7 @@ Returns:
 
 https://stackoverflow.com/questions/47086599/parallelising-tf-data-dataset-from-generator
 """
+from __future__ import print_function
 from foreground import get_foreground
 from normalize import reinhard
 from openslide import OpenSlide
@@ -16,27 +17,33 @@ import numpy as np
 import cv2
 
 class Slide(object):
-    slide_defaults = {
-        'slide_path': None,
-        'low_level_mag': 5,
-        'preprocess_fn': lambda x: x,  ## ID
-        'process_mag': 10,
-        'process_size': 256,
-        'normalize_fn': reinhard,
-        'oversample_factor': 1.25,
-        'output_types': [],
-        'verbose': False}
-
     # set up constants parse slide information
     # set up output image
     def __init__(self, **kwargs):
-        self.slide_defaults.update(kwargs)
-        for key, val in self.slide_defaults.items():
+        slide_defaults = {
+            'slide_path': None,
+            'low_level_mag': 5,
+            'preprocess_fn': lambda x: x,  ## ID
+            'process_mag': 10,
+            'process_size': 256,
+            'normalize_fn': reinhard,
+            'oversample_factor': 1.25,
+            'output_types': [],
+            'output_mag': 5,
+            'verbose': False}
+
+        slide_defaults.update(kwargs)
+        for key, val in slide_defaults.items():
             setattr(self, key, val)
 
         self.svs = self._parse_svs_info()
+
+        ## TODO allow choice of output size by providing and output_mag
+        ## Get level according to downsample for scan size --> output_mag.
+
         # self.low_level_index = self.get_low_level_index()
-        self.foreground = get_foreground(self.svs, low_level_index=2)
+        # self.foreground = get_foreground(self.svs, low_level_index=2)
+        self.foreground = get_foreground(self.svs)
         self._get_load_params()
         self.tile()
 
@@ -65,11 +72,11 @@ class Slide(object):
         low_power_dim = svs.level_dimensions[-1][::-1]
 
         if self.verbose:
-            print 'Slide: %s' % self.slide_path
-            print '\t power: %d' % scan_power
-            print '\t levels: %d' % level_count
-            print '\t high_power_dim: %d %d' % (high_power_dim)
-            print '\t low_power_dim: %d %d' % (low_power_dim)
+            print('Slide: %s' % self.slide_path)
+            print('\t power: %d' % scan_power)
+            print('\t levels: %d' % level_count)
+            print('\t high_power_dim: %d %d' % (high_power_dim))
+            print('\t low_power_dim: %d %d' % (low_power_dim))
 
         self.slide_info = {
             'scan_power': scan_power,
@@ -80,7 +87,7 @@ class Slide(object):
 
 
     def close(self):
-        print 'Closing slide'
+        print('Closing slide')
         self.foreground = []
         self.output_imgs = []
         self.svs.close()
@@ -110,9 +117,9 @@ class Slide(object):
         ds_load_level = int(self.svs.level_downsamples[loading_level])
 
         if self.verbose:
-            print 'Requested processing size: {}'.format(process_size)
-            print 'Estimated loading from level: {}'.format(loading_level)
-            print 'Downsample at estimated level: {}'.format(ds_load_level)
+            print('Requested processing size: {}'.format(process_size))
+            print('Estimated loading from level: {}'.format(loading_level))
+            print('Downsample at estimated level: {}'.format(ds_load_level))
 
         self.ds_load_level = ds_load_level
 
@@ -120,16 +127,16 @@ class Slide(object):
         ## scan @ Nx ; request 5x
         if ds_load_level == downsample:
             if self.verbose:
-                print 'Loading size: {} ({}x processing size)'.format(
-                    process_size, 1)
+                print('Loading size: {} ({}x processing size)'.format(
+                    process_size, 1))
             return process_size, 1
 
         ## scan @ 40x; request 20x
         if ds_load_level < downsample:
             ratio = int(downsample / ds_load_level)
             if self.verbose:
-                print 'Loading size: {} ({}x processing size)'.format(
-                    process_size*ratio, ratio)
+                print('Loading size: {} ({}x processing size)'.format(
+                    process_size*ratio, ratio))
             return process_size*ratio, 1./ratio
 
 
@@ -144,11 +151,11 @@ class Slide(object):
             loading_level, downsample)
 
         if self.verbose:
-            print 'Slide scanned at {} magnification'.format(self.slide_info['scan_power'])
-            print 'Requested processing at {} magnification'.format(self.process_mag)
-            print 'Downsample ~ {}'.format(downsample)
-            print 'Load from level {}'.format(loading_level)
-            print 'Level {} dimensions: {}'.format(loading_level, load_level_dims)
+            print('Slide scanned at {} magnification'.format(self.slide_info['scan_power']))
+            print('Requested processing at {} magnification'.format(self.process_mag))
+            print('Downsample ~ {}'.format(downsample))
+            print('Load from level {}'.format(loading_level))
+            print('Level {} dimensions: {}'.format(loading_level, load_level_dims))
 
         self.downsample = downsample
         self.loading_level = loading_level
@@ -159,14 +166,13 @@ class Slide(object):
 
     # Logic translating processing size into reconstruct() args
     def _get_place_params(self):
-        ## Place w.r.t. level 0
-        ## We have process downsample.. and downsample w.r.t. Last level
-        ds_low_level = int(self.svs.level_downsamples[2])
+        ## TODO allow choice of output size
+        ds_low_level = int(self.svs.level_downsamples[-1])
         place_downsample = self.downsample / float(ds_low_level)
         self.ds_low_level = ds_low_level
         place_size = int(self.process_size * place_downsample)
         if self.verbose:
-            print 'Placing size: {}'.format(place_size)
+            print('Placing size: {}'.format(place_size))
 
         self.place_size = place_size
 
@@ -234,9 +240,9 @@ class Slide(object):
             int(est_x*self.oversample_factor), dtype=np.int64)
 
         if self.verbose:
-            print 'Estimated w={} x h={} tiles'.format(est_x, est_y)
-            print 'With oversample ~ {}, split x={} x y={}'.format(
-                self.oversample_factor, len(x_coord), len(y_coord) )
+            print('Estimated w={} x h={} tiles'.format(est_x, est_y))
+            print('With oversample ~ {}, split x={} x y={}'.format(
+                self.oversample_factor, len(x_coord), len(y_coord) ))
 
         self.y_coord = y_coord
         self.x_coord = x_coord
@@ -261,8 +267,8 @@ class Slide(object):
                          xx*self.ds_load_level])
 
         if self.verbose:
-            print 'Started with {} candidate tiles'.format(len(yc)*len(xc))
-            print 'Got {} foreground tiles'.format(len(tile_list))
+            print('Started with {} candidate tiles'.format(len(yc)*len(xc)))
+            print('Got {} foreground tiles'.format(len(tile_list)))
 
         self.tile_list = tile_list
 
@@ -279,10 +285,17 @@ class Slide(object):
             x1 = x0 + int(self.place_size)
             y1 = y0 + int(self.place_size)
             # print 'Resize {} --> {}'.format(x.shape, self.place_size),
-            x = cv2.resize(x, dsize=(int(self.place_size),
-                int(self.place_size)))
+            x = cv2.resize(x, dsize=(int(self.place_size), int(self.place_size)))
             # print 'placing {}:{}, {}:{} ; {}'.format(x0, x1, y0, y1, x.shape)
-            self.output_imgs[name][y0:y1, x0:x1, :] += x
+            try:
+                self.output_imgs[name][y0:y1, x0:x1, :] += x
+            except:
+                print('Caught exception placing into {}'.format(name))
+                print('\t idx: {}'.format(idx))
+                print('\t x: {}'.format(x.shape))
+                print('\t x0 : x1: {} : {}'.format(x0, x1))
+                print('\t y0 : y1: {} : {}'.format(y0, y1))
+
         elif mode=='tile':
             location = self.ds_tile_map == idx
             self.output_imgs[name][location] = x
@@ -301,9 +314,9 @@ class Slide(object):
         self.twice_overlapping = prob_sum == 2
         self.thrice_overlapping = prob_sum == 3
         self.quad_overlapping = prob_sum == 4
-        print 'Found {} areas with 2x coverage'.format(self.twice_overlapping.sum())
-        print 'Found {} areas with 3x coverage'.format(self.thrice_overlapping.sum())
-        print 'Found {} areas with 4x coverage'.format(self.quad_overlapping.sum())
+        print('Found {} areas with 2x coverage'.format(self.twice_overlapping.sum()))
+        print('Found {} areas with 3x coverage'.format(self.thrice_overlapping.sum()))
+        print('Found {} areas with 4x coverage'.format(self.quad_overlapping.sum()))
 
 
     # colorize, and write out
@@ -317,25 +330,25 @@ class Slide(object):
 
 
     def print_info(self):
-        print '\n======================= SLIDE ======================'
-        print '|'
+        print('\n======================= SLIDE ======================')
+        print('|')
         for key, val in sorted(self.__dict__.items()):
             if 'list' in key:
-                print '|\t {}:\n|\t\t\tlength: {}'.format(key, len(val))
+                print('|\t {}:\n|\t\t\tlength: {}'.format(key, len(val)))
                 continue
 
             if type(val) is np.ndarray:
-                print '|\t {}:\n|\t\t\tshape: {}'.format(key, val.shape)
+                print('|\t {}:\n|\t\t\tshape: {}'.format(key, val.shape))
                 continue
 
             if key == 'output_imgs':
                 try:
                     for vk, vv in val.items():
-                        print '|\t {}:\n|\t\t\t{}: {}'.format(key, vk, vv.shape)
+                        print('|\t {}:\n|\t\t\t{}: {}'.format(key, vk, vv.shape))
                 except:
-                    print '|\t {}:\n|\t\t\tlen: {}'.format(key, len(val))
+                    print('|\t {}:\n|\t\t\tlen: {}'.format(key, len(val)))
                 continue
 
-            print '|\t {}:\n|\t\t\t{}'.format(key, val)
-        print '|'
-        print '======================= SLIDE ======================\n'
+            print('|\t {}:\n|\t\t\t{}'.format(key, val))
+        print('|')
+        print('======================= SLIDE ======================\n')
