@@ -10,15 +10,14 @@ Returns:
 https://stackoverflow.com/questions/47086599/parallelising-tf-data-dataset-from-generator
 """
 from __future__ import print_function
-from foreground import get_foreground
-from normalize import reinhard
 from openslide import OpenSlide
 import numpy as np
 import cv2
 
+from .foreground import get_foreground
+from .normalize import reinhard
+
 class Slide(object):
-    # set up constants parse slide information
-    # set up output image
     def __init__(self, **kwargs):
         slide_defaults = {
             'slide_path': None,
@@ -72,8 +71,8 @@ class Slide(object):
         high_power_dim = svs.level_dimensions[0][::-1]
         low_power_dim = svs.level_dimensions[-1][::-1]
 
-        if scan_power == 20 and level_count ==4:
-            raise Exception('Malformed slide. {}'.format(self.slide_path))
+        #if scan_power == 20 and level_count ==4:
+        #    raise Exception('Malformed slide. {}'.format(self.slide_path))
 
         if self.verbose:
             print('Slide: %s' % self.slide_path)
@@ -86,7 +85,8 @@ class Slide(object):
             'scan_power': scan_power,
             'level_count': level_count,
             'high_power_dim': high_power_dim,
-            'low_power_dim': low_power_dim }
+            'low_power_dim': low_power_dim,
+            'level_dimensions': svs.level_dimensions }
         return svs
 
 
@@ -145,7 +145,7 @@ class Slide(object):
     # Logic translating slide params and requested process_mag into read_region args
     def _get_load_params(self):
         ## Add a small number to the requested downsample because often we're off by some.
-        EPS = 1e-2
+        EPS = 1e-3
         downsample = int(self.slide_info['scan_power'] / self.process_mag)
         loading_level = self.svs.get_best_level_for_downsample(downsample+EPS)
         load_level_dims = self.svs.level_dimensions[loading_level][::-1]
@@ -168,7 +168,6 @@ class Slide(object):
 
     # Logic translating processing size into reconstruct() args
     def _get_place_params(self):
-        ## TODO allow choice of output size
         ds_low_level = int(self.svs.level_downsamples[-1])
         place_downsample = self.downsample / float(ds_low_level)
         self.ds_low_level = ds_low_level
@@ -222,9 +221,11 @@ class Slide(object):
             yield idx
 
 
+    ## TODO add live skipping of white area
     def generator(self):
         for idx, coords in enumerate(self.tile_list):
-            yield self._read_tile(coords), idx
+            img = self._read_tile(coords)
+            yield img, idx
 
 
     # Generate a list of foreground tiles
@@ -286,18 +287,8 @@ class Slide(object):
             y0, x0 = place_coord
             x1 = x0 + int(self.place_size)
             y1 = y0 + int(self.place_size)
-            # print 'Resize {} --> {}'.format(x.shape, self.place_size),
             x = cv2.resize(x, dsize=(int(self.place_size), int(self.place_size)))
-            # print 'placing {}:{}, {}:{} ; {}'.format(x0, x1, y0, y1, x.shape)
-            try:
-                self.output_imgs[name][y0:y1, x0:x1, :] += x
-            except:
-                print('Caught exception placing into {}'.format(name))
-                print('\t idx: {}'.format(idx))
-                print('\t x: {}'.format(x.shape))
-                print('\t x0 : x1: {} : {}'.format(x0, x1))
-                print('\t y0 : y1: {} : {}'.format(y0, y1))
-
+            self.output_imgs[name][y0:y1, x0:x1, :] += x
         elif mode=='tile':
             location = self.ds_tile_map == idx
             self.output_imgs[name][location] = x
@@ -331,6 +322,11 @@ class Slide(object):
             self.output_imgs[key] = img
 
 
+    """ Prints info about itself
+
+    helper function callable externally to print all the attributes
+
+    """
     def print_info(self):
         print('\n======================= SLIDE ======================')
         print('|')

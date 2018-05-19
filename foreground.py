@@ -52,7 +52,7 @@ def whitespace(img, mode='Otsu', white_pt=225):
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (15, 15))
         img = cv2.morphologyEx(img, cv2.MORPH_CLOSE, kernel)
     else:
-        raise ValueError('tile::whitespace mode must be "Otsu" or "thresh"')
+        raise ValueError('foreground:whitespace mode must be "Otsu" or "thresh"')
 
     return img > 0
 

@@ -1,17 +1,17 @@
+from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 import tensorflow.contrib.eager as tfe
 import sys
 import cv2
 
-sys.path.insert(0, '..')
-from slide import Slide
+from ..slide import Slide
 
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 tfe.enable_eager_execution(config=config)
 
-print '\nslide at 5x'
+print('\nslide at 5x')
 slide_path = '/home/nathan/data/ccrcc/TCGA_KIRC/'
 slide_path += 'TCGA-A3-3346-01Z-00-DX1.95280216-fd71-4a03-b452-6e3d667f2542.svs'
 preprocess_fn = lambda x: (x * (2/255.)) - 1

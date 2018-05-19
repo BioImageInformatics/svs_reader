@@ -1,11 +1,11 @@
+from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 import sys
 import cv2
 import time
 
-sys.path.insert(0, '..')
-from slide import Slide
+from ..slide import Slide
 
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
@@ -26,8 +26,6 @@ svs = Slide(slide_path    = slide_path,
 svs.print_info()
 svs.initialize_output('features', dim=3, mode='tile')
 
-# for ix in s.generate_index():
-#     print ix
 
 def wrapped_fn(idx):
     coords = svs.tile_list[idx]
@@ -54,7 +52,7 @@ with tf.Session(config=config) as sess:
     iterator = ds.make_one_shot_iterator()
     img, idx = iterator.get_next()
 
-    print 'Starting'
+    print('Starting')
     tstart = time.time()
     while True:
         try:
@@ -62,10 +60,10 @@ with tf.Session(config=config) as sess:
             features = feature_fn(img_)
             svs.place(features, idx_, name='features', mode='tile')
         except tf.errors.OutOfRangeError:
-            print 'End'
+            print('End')
             break
 
-    print 'Finished in {}s'.format(time.time() - tstart)
+    print('Finished in {}s'.format(time.time() - tstart))
 
     img_out = svs.output_imgs['features']
     cv2.imwrite('test_tile_reconstruction.jpg', img_out * (255. / img_out.max()))

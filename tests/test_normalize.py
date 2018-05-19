@@ -1,6 +1,6 @@
+from __future__ import print_function
 import cv2
 import numpy as np
 import sys
 
-sys.path.insert(0, '..')
-from normalize import reinhard
+from ..normalize import reinhard

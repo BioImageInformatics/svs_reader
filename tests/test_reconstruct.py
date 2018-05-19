@@ -1,11 +1,11 @@
+from __future__ import print_function
 import cv2
 import numpy as np
 import sys
 
 from matplotlib import pyplot as plt
 
-sys.path.insert(0, '..')
-from slide import Slide
+from ..slide import Slide
 
 s = Slide(slide_path='/home/nathan/data/ccrcc/TCGA_KIRC/TCGA-A3-3346-01Z-00-DX1.95280216-fd71-4a03-b452-6e3d667f2542.svs',
         process_mag=5,
@@ -18,7 +18,7 @@ for idx, img in enumerate(s.generator()):
     s.place(img[:,:,::-1], idx)
 
 reconstruction = s.output_img
-print reconstruction.shape
+print(reconstruction.shape)
 
 plt.imshow(reconstruction)
 plt.show()
