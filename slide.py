@@ -10,16 +10,14 @@ Returns:
 https://stackoverflow.com/questions/47086599/parallelising-tf-data-dataset-from-generator
 """
 from __future__ import print_function
-from foreground import get_foreground
-from normalize import reinhard
 from openslide import OpenSlide
 import numpy as np
 import cv2
 
-class Slide(object):
+from .foreground import get_foreground
+from .normalize import reinhard
 
-    # set up constants parse slide information
-    # set up output image
+class Slide(object):
     def __init__(self, **kwargs):
         slide_defaults = {
             'slide_path': None,
@@ -318,6 +316,11 @@ class Slide(object):
             self.output_imgs[key] = img
 
 
+    """ Prints info about itself
+
+    helper function callable externally to print all the attributes
+
+    """
     def print_info(self):
         print('\n======================= SLIDE ======================')
         print('|')

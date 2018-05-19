@@ -1,11 +1,11 @@
+from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 import sys
 import cv2
 import time
 
-sys.path.insert(0, '..')
-from slide import Slide
+from ..slide import Slide
 
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
@@ -58,15 +58,14 @@ with tf.Session(config=config) as sess:
     iterator = ds.make_one_shot_iterator()
     img, idx = iterator.get_next()
 
-    print 'Starting'
+    print('Starting')
     tstart = time.time()
-    # for x in range(len(s.tile_list)):
     while True:
         try:
             img_, idx_ = sess.run([img, idx])
-            print idx_, img_.shape, img_.dtype
+            print(idx_, img_.shape, img_.dtype)
         except Exception as e:
             print(e)
             break
 
-    print 'Finished in {}s'.format(time.time() - tstart)
+    print('Finished in {}s'.format(time.time() - tstart))

@@ -1,3 +1,4 @@
+from __future__ import print_function
 import cv2
 import numpy as np
 from openslide import OpenSlide
@@ -5,8 +6,8 @@ from openslide import OpenSlide
 def read_region(svs, x, y, level, size, flip_channels=False, verbose=False):
     # Utility function because openslide loads as RGBA
     if verbose:
-        print 'Reading SVS: ({},{}), LEVEL {}, SIZE={}'.format(
-            x,y,level,size)
+        print('Reading SVS: ({},{}), LEVEL {}, SIZE={}'.format(
+            x,y,level,size))
     #/end if
 
     ## TODO Check if region is out of range for the requested level
@@ -50,7 +51,7 @@ def whitespace(img, mode='Otsu', white_pt=225):
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (15, 15))
         img = cv2.morphologyEx(img, cv2.MORPH_CLOSE, kernel)
     else:
-        raise ValueError('tile::whitespace mode must be "Otsu" or "thresh"')
+        raise ValueError('foreground:whitespace mode must be "Otsu" or "thresh"')
 
     return img > 0
 
