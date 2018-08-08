@@ -1,23 +1,52 @@
-"""
-Args:
-  slide_path: string
-  process_mag: string
-  process_size: int
-
-Returns:
-  Slide object
-
-https://stackoverflow.com/questions/47086599/parallelising-tf-data-dataset-from-generator
-"""
 from __future__ import print_function
 from openslide import OpenSlide
 import numpy as np
+import time
 import cv2
 
 from foreground import get_foreground
 from normalize import reinhard
 
 class Slide(object):
+    """ Slide object for interfacing with Aperio SVS slides
+
+    Upon initialization the Slide object opens the SVS file, finds tissue area,
+    using Otsu thresholding, and populates a list of tiles at the requested magnification
+    and size.
+
+    ```
+    slide_defaults = {
+        'slide_path': None,
+        'low_level_mag': 5,
+        'preprocess_fn': lambda x: x,  ## ID
+        'process_mag': 10,
+        'process_size': 256,
+        'normalize_fn': reinhard,
+        'background_speed': 'fast', # One of 'fast' or 'accurate'
+        'background_threshold': 210,
+        'background_pct': 0.15,
+        'oversample_factor': 1.25,
+        'output_types': [],
+        'output_res': '5x',
+        'verbose': False}
+    ```
+
+    Args:
+        slide_path: path to the slide
+        process_mag: int for the magnification level (5, 10, 20, 40)
+        process_size: int edge length of the tile.
+        normalize_fn: function to apply on each individual tile before returning
+        oversample_factor: float, the factor by which to oversample from the slide when 
+            returning tiles
+        
+        # Planned
+        low_level_mag: magnification to hold the reconstructed images
+
+    Returns:
+        Slide object
+
+    https://stackoverflow.com/questions/47086599/parallelising-tf-data-dataset-from-generator
+    """
     def __init__(self, **kwargs):
         slide_defaults = {
             'slide_path': None,
@@ -26,7 +55,10 @@ class Slide(object):
             'process_mag': 10,
             'process_size': 256,
             'normalize_fn': reinhard,
-            'oversample': 1.25,
+            'background_speed': 'fast', # One of 'fast' or 'accurate'
+            'background_threshold': 210,
+            'background_pct': 0.15,
+            'oversample_factor': 1.25,
             'output_types': [],
             'output_mag': 5,
             'verbose': False}
@@ -57,12 +89,15 @@ class Slide(object):
         ## Use the scanned power, and requested magnification to find the downsample factor
         pass
 
-    # Returns the OpenSlide object
-    # Populates a dict with:
-    # - scanning power
-    # - downsample fractions
-    # - low-level dimensions
     def _parse_svs_info(self):
+        """ Returns the OpenSlide object
+
+        Populates a dict with:
+        - scanning power
+        - downsample fractions
+        - low-level dimensions
+        """
+
         svs = OpenSlide(self.slide_path)
         scan_power = int(svs.properties['aperio.AppMag'])
         level_count = svs.level_count
@@ -89,14 +124,21 @@ class Slide(object):
 
 
     def close(self):
+        """ Close references to the slide and generated outputs
+
+        """
+
         print('Closing slide')
         self.foreground = []
         self.output_imgs = []
         self.svs.close()
 
 
-    # Set up the output image to the same size as the level-0 shape
     def initialize_output(self, name, dim, mode='full'):
+        """ Set up the output image to the same size as the level-0 shape
+
+        """
+
         ## Initialize an image for dimensions preserving output
         if mode=='full':
             h,w = self.foreground.shape[:2]
@@ -140,8 +182,11 @@ class Slide(object):
             return process_size*ratio, 1./ratio
 
 
-    # Logic translating slide params and requested process_mag into read_region args
     def _get_load_params(self):
+        """ Translate slide params and requested `process_mag` into `read_region` args
+
+        """
+
         ## Add a small number to the requested downsample because often we're off by some.
         EPS = 1e-3
         downsample = int(self.slide_info['scan_power'] / self.process_mag)
@@ -164,8 +209,13 @@ class Slide(object):
         self.post_load_resize = post_load_resize
 
 
-    # Logic translating processing size into reconstruct() args
     def _get_place_params(self):
+        """ Logic translating processing size into reconstruct() args
+
+        """
+
+        ## Place w.r.t. level 0
+        ## We have process downsample.. and downsample w.r.t. Last level
         ds_low_level = int(self.svs.level_downsamples[-1])
         place_downsample = self.downsample / float(ds_low_level)
         self.ds_low_level = ds_low_level
@@ -184,10 +234,15 @@ class Slide(object):
         self.place_list = place_list
 
 
-    ## Returns the parameters needed to replicate the corresponding
-    ## call to _read_tile
-    ## return y1, y2, x1, x2, level, downsample
     def _read_region_args(self, coords):
+        """ Returns the parameters needed to for _read_tile
+
+        ! TODO This function appears unused
+
+        return: y1, y2, x1, x2, level, downsample
+
+        """
+
         y1, x1 = coords
         # y1 = int(y1 * self.post_load_resize)
         # x1 = int(x1 * self.post_load_resize)
@@ -199,18 +254,29 @@ class Slide(object):
         downsample = self.post_load_resize
         return y1, y2, x1, x2, level, downsample
 
-    # Call openslide.read_region on the slide
-    # with all the right settings: level, dimensions, etc.
-    def _read_tile(self, coords):
+
+    def _read_tile(self, coords, as_is=False):
+        """ Call openslide.read_region on the slide
+
+        passes in all the right settings: level, dimensions, etc.
+
+        """
+
         y, x = coords
         size = (self.loading_size, self.loading_size)
         img = self.svs.read_region((x, y), self.loading_level, size)
         img = np.array(img)
         img = cv2.cvtColor(img, cv2.COLOR_RGBA2RGB)
-        img = self.normalize_fn(img)
+
+        if not as_is:
+            img = self.normalize_fn(img)
+
+        # CV2 has issues with image dtype and range
         img = cv2.resize(img, dsize=(0,0), fx=self.post_load_resize,
             fy=self.post_load_resize)
-        img = self.preprocess_fn(img)
+
+        if not as_is:
+            img = self.preprocess_fn(img)
         return img
 
 
@@ -226,11 +292,15 @@ class Slide(object):
             yield img, idx
 
 
-    # Generate a list of foreground tiles
-    # 1. Call get_foreground
-    # 2. Estimate tiles, with/without overlap according to settings
-    # 3. Reject background-only tiles
     def _find_all_tiles(self):
+        """ Generate a list of foreground tiles
+
+        1. Call get_foreground
+        2. Estimate tiles, with/without overlap according to settings
+        3. Reject background-only tiles
+        
+        """
+
         load_y, load_x = self.load_level_dims
         est_y = int(load_y / self.loading_size)
         est_x = int(load_x / self.loading_size)
@@ -249,7 +319,15 @@ class Slide(object):
         self.x_coord = x_coord
 
 
-    def _reject_background(self):
+    def _fast_reject_background(self):
+        """ Reject background tiles by amount of white space
+
+        - Creates `Slide.tile_list`
+
+        Fast background rejection based on the low-mag foreground.
+        Pros: Fast
+        Cons: Keeps mistakes made by morphological operations + flood filling
+        """
         yc, xc = self.y_coord, self.x_coord
         foreground_ds = cv2.resize(self.foreground,
                                    dsize=( len(xc), len(yc) ),
@@ -273,9 +351,55 @@ class Slide(object):
 
         self.tile_list = tile_list
 
+
+    def _accurate_reject_background(self):
+        """ Reject background by reading tiles and making indiviual decisions
+
+        - Creates `Slide.tile_list`
+
+        Read from the lowest mag ?
+        First use the original method, then further refine the listing
+        """
+        if self.verbose:
+            print('Accurate reject background method:')
+
+        self._fast_reject_background()
+        new_tile_list = []
+        new_ds_tile_map = np.zeros((len(self.y_coord), len(self.x_coord)), dtype=np.uint64)-1
+        if self.verbose:
+            print('Initial tile list: {}'.format(len(self.tile_list)))
+            tstart = time.time()
+
+        new_tile_idx = 0
+        for tile_idx, tile in enumerate(self.tile_list):
+            img = self._read_tile(tile, as_is=True)
+
+            gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+            white = gray > self.background_threshold
+
+            if (white.sum() / float(img.shape[0] * img.shape[1])) > self.background_pct:
+                continue
+            else:
+                new_tile_list.append(tile)
+                # Re-index the downsampled tile map
+                new_ds_tile_map[self.ds_tile_map == tile_idx] = new_tile_idx
+                new_tile_idx += 1
+
+        if self.verbose:
+            print('Finished in {:3.4f}s'.format(time.time() - tstart))
+            print('Pruned tile list: {}'.format(len(new_tile_list)))
+
+
+        self.tile_list = new_tile_list
+        self.ds_tile_map = new_ds_tile_map
+
+
     def tile(self):
         self.tile_list = self._find_all_tiles()
-        self._reject_background()
+        if self.background_speed == 'fast':
+            self._fast_reject_background()
+        elif self.background_speed == 'accurate':
+            self._accurate_reject_background()
 
 
     # place x into location, doing whatever downsampling is needed
@@ -322,7 +446,7 @@ class Slide(object):
 
     """ Prints info about itself
 
-    helper function callable externally to print all the attributes
+    helper function to print all the Slide attributes
 
     """
     def print_info(self):
