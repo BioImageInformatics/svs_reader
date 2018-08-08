@@ -14,8 +14,8 @@ from openslide import OpenSlide
 import numpy as np
 import cv2
 
-from .foreground import get_foreground
-from .normalize import reinhard
+from foreground import get_foreground
+from normalize import reinhard
 
 class Slide(object):
     def __init__(self, **kwargs):
@@ -26,11 +26,9 @@ class Slide(object):
             'process_mag': 10,
             'process_size': 256,
             'normalize_fn': reinhard,
-            'oversample_factor': 1.25,
+            'oversample': 1.25,
             'output_types': [],
             'output_mag': 5,
-            'verbose': False}
-            'output_res': '5x',
             'verbose': False}
         slide_defaults.update(kwargs)
         for key, val in slide_defaults.items():
@@ -238,14 +236,14 @@ class Slide(object):
         est_x = int(load_x / self.loading_size)
 
         y_coord = np.linspace(0, load_y-self.loading_size,
-            int(est_y*self.oversample_factor), dtype=np.int64)
+            int(est_y*self.oversample), dtype=np.int64)
         x_coord = np.linspace(0, load_x-self.loading_size,
-            int(est_x*self.oversample_factor), dtype=np.int64)
+            int(est_x*self.oversample), dtype=np.int64)
 
         if self.verbose:
             print('Estimated w={} x h={} tiles'.format(est_x, est_y))
             print('With oversample ~ {}, split x={} x y={}'.format(
-                self.oversample_factor, len(x_coord), len(y_coord) ))
+                self.oversample, len(x_coord), len(y_coord) ))
 
         self.y_coord = y_coord
         self.x_coord = x_coord
