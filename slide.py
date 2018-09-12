@@ -75,6 +75,9 @@ class Slide(object):
         self._get_place_params()
         self.output_imgs = {}
 
+        ## Finally check read tile
+        self._check_read_tile()
+
 
     def _get_low_level_index(self):
         ## get the info to read/write the low-level image more efficiently
@@ -82,6 +85,7 @@ class Slide(object):
         ## size to write output.
         ## Use the scanned power, and requested magnification to find the downsample factor
         pass
+
 
     def _parse_svs_info(self):
         """ Returns the OpenSlide object
@@ -117,17 +121,6 @@ class Slide(object):
         return svs
 
 
-    def close(self):
-        """ Close references to the slide and generated outputs
-
-        """
-
-        print('Closing slide')
-        self.foreground = []
-        self.output_imgs = []
-        self.svs.close()
-
-
     def initialize_output(self, name, dim, mode='full'):
         """ Set up the output image to the same size as the level-0 shape
 
@@ -150,6 +143,15 @@ class Slide(object):
 
 
     def _get_load_size(self, process_size, loading_level, downsample):
+        """ Process the current slide attributes and requested image size
+
+        Sets the attributes:
+        self.ds_load_level
+
+        Returns:
+            size and loading index for openslide.read_region()
+        """
+
         ds_load_level = int(self.svs.level_downsamples[loading_level])
 
         if self.verbose:
@@ -274,13 +276,34 @@ class Slide(object):
         return img
 
 
+    def _check_read_tile(self):
+        print('Checking tile read function')
+        coords = self.tile_list[0]
+        try:
+            ret = self._read_tile(coords)
+        except:
+            raise Exception('Read tile check failed')
+
+        print('Passed read check')
+
+
     def generate_index(self):
+        """ Returns an iterable of tile_list indices """
         for idx, _ in enumerate(self.tile_list):
             yield idx
 
 
     ## TODO add live skipping of white area
     def generator(self):
+        """ Returns an iterable list of (image, index) pairs
+
+        Example usage:
+        ``` python
+        svs = Slide(...)
+        generator = svs.generator()
+        img, idx = next(generator)
+        ```
+        """
         for idx, coords in enumerate(self.tile_list):
             img = self._read_tile(coords)
             yield img, idx
@@ -438,12 +461,16 @@ class Slide(object):
             self.output_imgs[key] = img
 
 
-    """ Prints info about itself
+    def close(self):
+        """ Close references to the slide and generated outputs """
+        print('Closing slide')
+        self.foreground = []
+        self.output_imgs = []
+        self.svs.close()
 
-    helper function to print all the Slide attributes
 
-    """
     def print_info(self):
+        """ Prints info about the slide object """
         print('\n======================= SLIDE ======================')
         print('|')
         for key, val in sorted(self.__dict__.items()):
