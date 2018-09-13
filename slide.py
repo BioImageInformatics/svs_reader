@@ -56,7 +56,7 @@ class Slide(object):
             'process_size': 256,
             'normalize_fn': reinhard,
             'background_speed': 'fast', # One of 'fast', 'accurate' or 'mask'
-            'background_img': None,
+            'background_image': None,
             'background_threshold': 210,
             'background_pct': 0.15,
             'oversample_factor': 1.25,
