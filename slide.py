@@ -55,7 +55,8 @@ class Slide(object):
             'process_mag': 10,
             'process_size': 256,
             'normalize_fn': reinhard,
-            'background_speed': 'fast', # One of 'fast' or 'accurate'
+            'background_speed': 'fast', # One of 'fast', 'accurate' or 'mask'
+            'background_img': None,
             'background_threshold': 210,
             'background_pct': 0.15,
             'oversample_factor': 1.25,
@@ -306,14 +307,14 @@ class Slide(object):
         est_x = int(load_x / self.loading_size)
 
         y_coord = np.linspace(0, load_y-self.loading_size,
-            int(est_y*self.oversample), dtype=np.int64)
+            int(est_y*self.oversample_factor), dtype=np.int64)
         x_coord = np.linspace(0, load_x-self.loading_size,
-            int(est_x*self.oversample), dtype=np.int64)
+            int(est_x*self.oversample_factor), dtype=np.int64)
 
         if self.verbose:
             print('Estimated w={} x h={} tiles'.format(est_x, est_y))
             print('With oversample ~ {}, split x={} x y={}'.format(
-                self.oversample, len(x_coord), len(y_coord) ))
+                self.oversample_factor, len(x_coord), len(y_coord) ))
 
         self.y_coord = y_coord
         self.x_coord = x_coord
@@ -335,7 +336,7 @@ class Slide(object):
 
         tile_idx = 0
         tile_list = []
-        self.ds_tile_map = np.zeros((len(yc), len(xc)), dtype=np.uint64)-1
+        self.ds_tile_map = np.zeros((len(yc), len(xc)), dtype=np.int)-1
         for yi, yy in enumerate(yc):
             for xi, xx in enumerate(xc):
                 if foreground_ds[yi, xi]==1:
@@ -351,7 +352,6 @@ class Slide(object):
 
         self.tile_list = tile_list
 
-
     def _accurate_reject_background(self):
         """ Reject background by reading tiles and making indiviual decisions
 
@@ -363,9 +363,13 @@ class Slide(object):
         if self.verbose:
             print('Accurate reject background method:')
 
-        self._fast_reject_background()
+        if self.background_image is None:
+            self._fast_reject_background()
+        else:
+            self._image_reference_background()
+
         new_tile_list = []
-        new_ds_tile_map = np.zeros((len(self.y_coord), len(self.x_coord)), dtype=np.uint64)-1
+        new_ds_tile_map = np.zeros((len(self.y_coord), len(self.x_coord)), dtype=np.int)-1
         if self.verbose:
             print('Initial tile list: {}'.format(len(self.tile_list)))
             tstart = time.time()
@@ -393,6 +397,41 @@ class Slide(object):
         self.tile_list = new_tile_list
         self.ds_tile_map = new_ds_tile_map
 
+    def _image_reference_background(self):
+        """ Reject background using a reference image
+
+        Same as fast method except we use a different reference.
+        By convention reference_img == 1 is the usable area.
+        """
+        if self.verbose:
+            print('Image reference background:')
+
+        # No fast background. We assume that's already been done:
+        reference_img = np.copy(self.background_image)
+        yc, xc = self.y_coord, self.x_coord
+        reference_img = cv2.resize(reference_img, 
+                                   dsize=( len(xc), len(yc)), 
+                                   interpolation = cv2.INTER_NEAREST)
+        reference_mask = reference_img == 1
+
+        self.ds_tile_map = np.zeros((len(yc), len(xc)), dtype=np.int)-1
+        tile_idx = 0
+        tile_list = []
+        for yi, yy in enumerate(yc):
+            for xi, xx in enumerate(xc):
+                if reference_mask[yi, xi] ==1:
+                    self.ds_tile_map[yi, xi] = tile_idx
+                    tile_idx += 1
+                    tile_list.append(
+                        [yy*self.ds_load_level,
+                         xx*self.ds_load_level])
+
+        # Set attributes
+        self.tile_list = tile_list
+        if self.verbose:
+            print('{} tiles'.format(len(tile_list)))
+            print('down sample tile map: ', self.ds_tile_map.shape, self.ds_tile_map.min(), self.ds_tile_map.max())
+
 
     def tile(self):
         self.tile_list = self._find_all_tiles()
@@ -400,6 +439,9 @@ class Slide(object):
             self._fast_reject_background()
         elif self.background_speed == 'accurate':
             self._accurate_reject_background()
+        elif self.background_speed == 'image':
+            self._image_reference_background()
+
 
 
     # place x into location, doing whatever downsampling is needed
