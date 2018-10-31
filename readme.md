@@ -2,8 +2,21 @@
 
 An object for interfacing __usually__ Aperio's SVS slide images. Wraps OpenSlide.
 
-TL;DR:
 Find foreground, tile foreground, yield tiles. See tests for some example scripts.
+
+### Installation
+Prerequisites:
+```
+openslide-python
+opencv
+numpy
+```
+
+To install:
+```
+/usr/env/bin/pip install -e .
+```
+
 
 ### License
 Please provide citation if you use this library for your research.
