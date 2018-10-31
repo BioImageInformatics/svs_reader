@@ -17,6 +17,11 @@ To install:
 /usr/env/bin/pip install -e .
 ```
 
+To use:
+```
+$ python
+>>> from svs_reader import Slide
+```
 
 ### License
 Please provide citation if you use this library for your research.
