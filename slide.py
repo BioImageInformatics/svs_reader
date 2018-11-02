@@ -389,7 +389,9 @@ class Slide(object):
         if self.background_image is None:
             self._fast_reject_background()
         else:
+            print('Accurate background requested but image was supplied')
             self._image_reference_background()
+            return
 
         new_tile_list = []
         new_ds_tile_map = np.zeros((len(self.y_coord), len(self.x_coord)), dtype=np.int)-1
@@ -435,7 +437,7 @@ class Slide(object):
         reference_img = cv2.resize(reference_img, 
                                    dsize=( len(xc), len(yc)), 
                                    interpolation = cv2.INTER_NEAREST)
-        reference_mask = reference_img == 1
+        reference_mask = reference_img > 0
 
         self.ds_tile_map = np.zeros((len(yc), len(xc)), dtype=np.int)-1
         tile_idx = 0
@@ -455,7 +457,6 @@ class Slide(object):
             print('{} tiles'.format(len(tile_list)))
             print('down sample tile map: ', self.ds_tile_map.shape, self.ds_tile_map.min(), self.ds_tile_map.max())
 
-
     def tile(self):
         self.tile_list = self._find_all_tiles()
         if self.background_speed == 'fast':
@@ -464,8 +465,6 @@ class Slide(object):
             self._accurate_reject_background()
         elif self.background_speed == 'image':
             self._image_reference_background()
-
-
 
     # place x into location, doing whatever downsampling is needed
     def place(self, x, idx, name, mode='full'):
