@@ -4,8 +4,8 @@ import numpy as np
 import time
 import cv2
 
-from foreground import get_foreground
-from normalize import reinhard
+from .foreground import get_foreground
+from .normalize import reinhard
 
 class Slide(object):
     """ Slide object for interfacing with Aperio SVS slides
@@ -352,6 +352,9 @@ class Slide(object):
         Pros: Fast
         Cons: Keeps mistakes made by morphological operations + flood filling
         """
+        if self.verbose:
+            print('Fast reject background')
+
         yc, xc = self.y_coord, self.x_coord
         foreground_ds = cv2.resize(self.foreground,
                                    dsize=( len(xc), len(yc) ),
@@ -430,6 +433,13 @@ class Slide(object):
         """
         if self.verbose:
             print('Image reference background:')
+
+        # Catch case when image is requested but supplied image is none
+        # Perform default background and exit.
+        if self.background_image is None:
+            print('Background image is none. Default to fast reject background')
+            self._fast_reject_background()
+            return
 
         # No fast background. We assume that's already been done:
         reference_img = np.copy(self.background_image)
