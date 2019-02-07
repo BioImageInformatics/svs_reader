@@ -463,9 +463,6 @@ class Slide(object):
 
         # Set attributes
         self.tile_list = tile_list
-        if self.verbose:
-            print('{} tiles'.format(len(tile_list)))
-            print('down sample tile map: ', self.ds_tile_map.shape, self.ds_tile_map.min(), self.ds_tile_map.max())
 
     def tile(self):
         self.tile_list = self._find_all_tiles()
@@ -475,6 +472,10 @@ class Slide(object):
             self._accurate_reject_background()
         elif self.background_speed == 'image':
             self._image_reference_background()
+
+        if self.verbose:
+            print('{} tiles'.format(len(self.tile_list)))
+            print('down sample tile map: ', self.ds_tile_map.shape, self.ds_tile_map.min(), self.ds_tile_map.max())
 
     # place x into location, doing whatever downsampling is needed
     def place(self, x, idx, name, mode='full'):
@@ -493,7 +494,6 @@ class Slide(object):
         for x , idx in zip(xs,idxs):
             self.place(x, idx, name, mode=mode)
 
-
     ## Valid probability distribution sums to 1.
     ## We can tell where the overlaps are by finding areas that sum > 1
     def get_overlapping_images(self):
@@ -506,7 +506,6 @@ class Slide(object):
         print('Found {} areas with 2x coverage'.format(self.twice_overlapping.sum()))
         print('Found {} areas with 3x coverage'.format(self.thrice_overlapping.sum()))
         print('Found {} areas with 4x coverage'.format(self.quad_overlapping.sum()))
-
 
     # colorize, and write out
     def make_outputs(self):
@@ -521,8 +520,8 @@ class Slide(object):
     def close(self):
         """ Close references to the slide and generated outputs """
         print('Closing slide')
-        self.foreground = []
-        self.output_imgs = []
+        del self.foreground
+        del self.output_imgs
         self.svs.close()
 
 
