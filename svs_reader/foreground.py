@@ -28,7 +28,7 @@ def read_region(svs, x, y, level, size, flip_channels=False, verbose=False):
 
 def read_low_level(svs, low_level_index=None, verbose=False):
     if low_level_index is None:
-        print('Inferring low level: {}'.format(svs.level_count - 1))
+        # print('Inferring low level: {}'.format(svs.level_count - 1))
         low_index = svs.level_count - 1
     else:
         low_index = low_level_index

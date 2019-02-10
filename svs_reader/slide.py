@@ -497,27 +497,40 @@ class Slide(object):
 
     ## Valid probability distribution sums to 1.
     ## We can tell where the overlaps are by finding areas that sum > 1
-    def get_overlapping_images(self):
-        prob_img = self.output_imgs['prob']
-        prob_sum = np.sum(prob_img, axis=-1)
+    def get_overlapping_images(self, reference):
+        ref_img = self.output_imgs[reference]
+        ref_sum = np.sum(ref_img, axis=-1)
 
-        self.twice_overlapping = prob_sum == 2
-        self.thrice_overlapping = prob_sum == 3
-        self.quad_overlapping = prob_sum == 4
-        print('Found {} areas with 2x coverage'.format(self.twice_overlapping.sum()))
-        print('Found {} areas with 3x coverage'.format(self.thrice_overlapping.sum()))
-        print('Found {} areas with 4x coverage'.format(self.quad_overlapping.sum()))
+        self.twice_overlapping  = (ref_sum == 2).astype(np.uint8)
+        self.thrice_overlapping = (ref_sum == 3).astype(np.uint8)
+        self.quad_overlapping   = (ref_sum == 4).astype(np.uint8)
+        # self.quint_overlapping  = (ref_sum == 5).astype(np.uint8)
+        # print('Used {} ({}) for overlap reference'.format(reference, ref_img.shape))
+        # print('Found {} areas with 2x coverage'.format(self.twice_overlapping.sum()))
+        # print('Found {} areas with 3x coverage'.format(self.thrice_overlapping.sum()))
+        # print('Found {} areas with 4x coverage'.format(self.quad_overlapping.sum()))
+        # print('Found {} areas with 5x coverage'.format(self.quint_overlapping.sum()))
 
-
-    # colorize, and write out
-    def make_outputs(self):
-        self.get_overlapping_images()
+    # colorize, and write out; adjust for mismatching sizes between prob, and all other outputs
+    def make_outputs(self, reference='prob'):
+        inter = cv2.INTER_LINEAR
+        self.get_overlapping_images(reference)
         for key, img in self.output_imgs.items():
-            img[self.twice_overlapping]  = img[self.twice_overlapping] / 2.
-            img[self.thrice_overlapping] = img[self.thrice_overlapping] / 3.
-            img[self.quad_overlapping]   = img[self.quad_overlapping] / 4.
+            img_size = img.shape[:2][::-1]
+            # print('Fixing overlaps in {} ({})'.format(key, img_size))
+            overlap_2 = cv2.resize(self.twice_overlapping, dsize=img_size, 
+                                   interpolation=inter).astype(np.bool)
+            overlap_3 = cv2.resize(self.thrice_overlapping, dsize=img_size, 
+                                   interpolation=inter).astype(np.bool)
+            overlap_4 = cv2.resize(self.quad_overlapping, dsize=img_size, 
+                                   interpolation=inter).astype(np.bool)
+            # overlap_5 = cv2.resize(self.quint_overlapping, dsize=img_size, 
+            #                        interpolation=inter).astype(np.bool)
+            img[overlap_2] = img[overlap_2] / 2.
+            img[overlap_3] = img[overlap_3] / 3.
+            img[overlap_4] = img[overlap_4] / 4.
+            # img[overlap_5] = img[overlap_5] / 5.
             self.output_imgs[key] = img
-
 
     def close(self):
         """ Close references to the slide and generated outputs """
