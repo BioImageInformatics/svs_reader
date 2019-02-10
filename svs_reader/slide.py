@@ -392,7 +392,9 @@ class Slide(object):
         if self.background_image is None:
             self._fast_reject_background()
         else:
+            print('Accurate background requested but image was supplied')
             self._image_reference_background()
+            return
 
         new_tile_list = []
         new_ds_tile_map = np.zeros((len(self.y_coord), len(self.x_coord)), dtype=np.int)-1
@@ -461,10 +463,6 @@ class Slide(object):
 
         # Set attributes
         self.tile_list = tile_list
-        if self.verbose:
-            print('{} tiles'.format(len(tile_list)))
-            print('down sample tile map: ', self.ds_tile_map.shape, self.ds_tile_map.min(), self.ds_tile_map.max())
-
 
     def tile(self):
         self.tile_list = self._find_all_tiles()
@@ -475,7 +473,9 @@ class Slide(object):
         elif self.background_speed == 'image':
             self._image_reference_background()
 
-
+        if self.verbose:
+            print('{} tiles'.format(len(self.tile_list)))
+            print('down sample tile map: ', self.ds_tile_map.shape, self.ds_tile_map.min(), self.ds_tile_map.max())
 
     # place x into location, doing whatever downsampling is needed
     def place(self, x, idx, name, mode='full'):
@@ -493,7 +493,6 @@ class Slide(object):
     def place_batch(self, xs, idxs, name, mode='full'):
         for x , idx in zip(xs,idxs):
             self.place(x, idx, name, mode=mode)
-
 
     ## Valid probability distribution sums to 1.
     ## We can tell where the overlaps are by finding areas that sum > 1
@@ -535,8 +534,8 @@ class Slide(object):
     def close(self):
         """ Close references to the slide and generated outputs """
         print('Closing slide')
-        self.foreground = []
-        self.output_imgs = []
+        del self.foreground
+        del self.output_imgs
         self.svs.close()
 
 
