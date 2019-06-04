@@ -478,21 +478,24 @@ class Slide(object):
             print('down sample tile map: ', self.ds_tile_map.shape, self.ds_tile_map.min(), self.ds_tile_map.max())
 
     # place x into location, doing whatever downsampling is needed
-    def place(self, x, idx, name, mode='full'):
+    def place(self, x, idx, name, mode='full', clobber=False):
         if mode=='full':
             place_coord = self.place_list[idx]
             y0, x0 = place_coord
             x1 = x0 + int(self.place_size)
             y1 = y0 + int(self.place_size)
             x = cv2.resize(x, dsize=(int(self.place_size), int(self.place_size)))
-            self.output_imgs[name][y0:y1, x0:x1, :] += x
+            if clobber:
+              self.output_imgs[name][y0:y1, x0:x1, :] = x
+            else:
+              self.output_imgs[name][y0:y1, x0:x1, :] += x
         elif mode=='tile':
             location = self.ds_tile_map == idx
             self.output_imgs[name][location] = x
 
-    def place_batch(self, xs, idxs, name, mode='full'):
+    def place_batch(self, xs, idxs, name, mode='full', clobber=False):
         for x , idx in zip(xs,idxs):
-            self.place(x, idx, name, mode=mode)
+            self.place(x, idx, name, mode=mode, clobber=clobber)
 
     ## Valid probability distribution sums to 1.
     ## We can tell where the overlaps are by finding areas that sum > 1
